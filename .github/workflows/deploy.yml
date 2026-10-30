@@ -23,6 +23,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
+    defaults:
+      run:
+        working-directory: project-bolt-sb1-njklajt3/project
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +45,7 @@ jobs:
       - name: Upload game
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: project-bolt-sb1-njklajt3/project/dist
 
       - name: Publish game
         id: deployment
