@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
 import { audio } from '@/lib/audio';
 import { RunnerGame, type GameResult } from '@/lib/game';
-import type { CharacterConfig } from '@/lib/character';
+import { getCharacterConfig, getBestScore, saveScore } from '@/lib/storage';
 import { Home, RotateCw, Trophy } from 'lucide-react';
 
 export function GameScreen({
@@ -13,25 +11,24 @@ export function GameScreen({
   onExit: () => void;
   onLeaderboard: () => void;
 }) {
-  const { profile } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<RunnerGame | null>(null);
+
   const [score, setScore] = useState(0);
   const [result, setResult] = useState<GameResult | null>(null);
   const [savedBest, setSavedBest] = useState<number | null>(null);
 
-  const cfg: CharacterConfig = {
-    character_type: profile?.character_type ?? 'blob',
-    body_color: profile?.body_color ?? '#22d3ee',
-    hat: profile?.hat ?? 'none',
-  };
+  const cfg = getCharacterConfig();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const game = new RunnerGame(canvas, cfg, onGameOver, setScore);
     gameRef.current = game;
+
     const onResize = () => game.resize();
+
     window.addEventListener('resize', onResize);
     game.start();
 
@@ -41,7 +38,9 @@ export function GameScreen({
         game.jump();
       }
     };
+
     window.addEventListener('keydown', onKey);
+
     const clickHandler = () => game.jump();
     canvas.addEventListener('pointerdown', clickHandler);
 
@@ -54,27 +53,11 @@ export function GameScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function onGameOver(r: GameResult) {
+  function onGameOver(r: GameResult) {
     setResult(r);
-    if (profile) {
-      const { data } = await supabase
-        .from('scores')
-        .insert({ user_id: profile.id, score: r.score, distance: r.distance })
-        .select('score')
-        .maybeSingle();
-      // fetch best
-      const { data: bestRow } = await supabase
-        .from('scores')
-        .select('score')
-        .eq('user_id', profile.id)
-        .order('score', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setSavedBest(bestRow?.score ?? r.score);
-      void data;
-    } else {
-      setSavedBest(r.score);
-    }
+
+    saveScore(r.score, r.distance);
+    setSavedBest(getBestScore());
   }
 
   function restart() {
@@ -82,12 +65,16 @@ export function GameScreen({
     audio.click();
     setResult(null);
     setScore(0);
+    setSavedBest(null);
     gameRef.current?.start();
   }
 
   return (
     <div className="relative w-full h-screen bg-sky-200 overflow-hidden">
-      <canvas ref={canvasRef} className="w-full h-full block touch-none" />
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full block touch-none"
+      />
 
       {/* Score HUD */}
       <div className="absolute top-4 right-4 bg-black/40 backdrop-blur text-white font-black text-2xl px-4 py-2 rounded-2xl tabular-nums">
@@ -96,7 +83,10 @@ export function GameScreen({
 
       {/* Exit */}
       <button
-        onClick={() => { audio.click(); onExit(); }}
+        onClick={() => {
+          audio.click();
+          onExit();
+        }}
         className="absolute top-4 left-4 bg-black/40 backdrop-blur text-white p-2 rounded-xl hover:bg-black/60 transition"
       >
         <Home className="w-5 h-5" />
@@ -113,17 +103,36 @@ export function GameScreen({
       {result && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center border border-white">
-            <div className="text-6xl mb-2 font-black text-rose-500">Oof!</div>
-            <h2 className="text-2xl font-black text-slate-800 mb-1">You crashed</h2>
-            <p className="text-slate-500 text-sm mb-6">That was a funny landing.</p>
+            <div className="text-6xl mb-2 font-black text-rose-500">
+              Oof!
+            </div>
+
+            <h2 className="text-2xl font-black text-slate-800 mb-1">
+              You crashed
+            </h2>
+
+            <p className="text-slate-500 text-sm mb-6">
+              That was a funny landing.
+            </p>
 
             <div className="grid grid-cols-2 gap-3 mb-6">
-              <Stat label="Score" value={result.score.toLocaleString()} />
-              <Stat label="Distance" value={`${result.distance}m`} />
+              <Stat
+                label="Score"
+                value={result.score.toLocaleString()}
+              />
+
+              <Stat
+                label="Distance"
+                value={`${result.distance}m`}
+              />
             </div>
+
             {savedBest !== null && (
               <p className="text-sm text-slate-500 mb-4">
-                Best score: <span className="font-black text-slate-700">{savedBest.toLocaleString()}</span>
+                Best score:{' '}
+                <span className="font-black text-slate-700">
+                  {savedBest.toLocaleString()}
+                </span>
               </p>
             )}
 
@@ -131,20 +140,31 @@ export function GameScreen({
               onClick={restart}
               className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black shadow-lg hover:from-amber-600 hover:to-orange-600 transition flex items-center justify-center gap-2 mb-3"
             >
-              <RotateCw className="w-5 h-5" /> Run Again
+              <RotateCw className="w-5 h-5" />
+              Run Again
             </button>
+
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => { audio.click(); onLeaderboard(); }}
+                onClick={() => {
+                  audio.click();
+                  onLeaderboard();
+                }}
                 className="py-2.5 rounded-2xl bg-emerald-100 text-emerald-700 font-bold hover:bg-emerald-200 transition flex items-center justify-center gap-2"
               >
-                <Trophy className="w-4 h-4" /> Scores
+                <Trophy className="w-4 h-4" />
+                Scores
               </button>
+
               <button
-                onClick={() => { audio.click(); onExit(); }}
+                onClick={() => {
+                  audio.click();
+                  onExit();
+                }}
                 className="py-2.5 rounded-2xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition flex items-center justify-center gap-2"
               >
-                <Home className="w-4 h-4" /> Menu
+                <Home className="w-4 h-4" />
+                Menu
               </button>
             </div>
           </div>
@@ -154,11 +174,22 @@ export function GameScreen({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
   return (
     <div className="bg-slate-50 rounded-2xl py-3 border border-slate-100">
-      <div className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="text-xl font-black text-slate-800 tabular-nums">{value}</div>
+      <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </div>
+
+      <div className="text-xl font-black text-slate-800 tabular-nums">
+        {value}
+      </div>
     </div>
   );
 }
