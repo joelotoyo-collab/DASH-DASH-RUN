@@ -1,146 +1,158 @@
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { ArrowLeft, Check, Save } from 'lucide-react';
+
 import { audio } from '@/lib/audio';
 import { CharacterPreview } from './CharacterPreview';
 import type { CharacterConfig } from '@/lib/character';
-import { Check, ArrowLeft } from 'lucide-react';
+import { getCharacterConfig, saveCharacterConfig } from '@/lib/storage';
+
+type CustomizeScreenProps = {
+  onBack: () => void;
+};
 
 const CHARACTERS = [
-  { id: 'blob', name: 'Blob', desc: 'Squishy and bouncy' },
-  { id: 'robot', name: 'Robo', desc: 'Built to dash' },
-  { id: 'ninja', name: 'Ninja', desc: 'Quick and stealthy' },
+  { id: 'blob', name: 'BLOB', description: 'The classic runner' },
+  { id: 'robot', name: 'ROBOT', description: 'Built for speed' },
+  { id: 'ninja', name: 'NINJA', description: 'Silent and swift' },
 ];
 
-const COLORS = ['#22d3ee', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#fb7185', '#60a5fa', '#f97316'];
+const COLORS = [
+  { id: '#22d3ee', name: 'Cyan' },
+  { id: '#a78bfa', name: 'Purple' },
+  { id: '#f472b6', name: 'Pink' },
+  { id: '#4ade80', name: 'Green' },
+  { id: '#facc15', name: 'Yellow' },
+  { id: '#fb923c', name: 'Orange' },
+  { id: '#f87171', name: 'Red' },
+  { id: '#f8fafc', name: 'White' },
+];
+
 const HATS = [
-  { id: 'none', name: 'None' },
-  { id: 'cap', name: 'Cap' },
-  { id: 'crown', name: 'Crown' },
-  { id: 'space', name: 'Space' },
+  { id: 'none', name: 'NONE' },
+  { id: 'cap', name: 'CAP' },
+  { id: 'crown', name: 'CROWN' },
+  { id: 'space', name: 'SPACE' },
 ];
 
-export function CustomizeScreen({ onBack }: { onBack: () => void }) {
-  const { profile, refreshProfile } = useAuth();
-  const [cfg, setCfg] = useState<CharacterConfig>({
-    character_type: profile?.character_type ?? 'blob',
-    body_color: profile?.body_color ?? '#22d3ee',
-    hat: profile?.hat ?? 'none',
-  });
-  const [username, setUsername] = useState(profile?.username ?? 'Runner');
-  const [saving, setSaving] = useState(false);
+export function CustomizeScreen({ onBack }: CustomizeScreenProps) {
+  const [cfg, setCfg] = useState<CharacterConfig>(getCharacterConfig);
   const [saved, setSaved] = useState(false);
 
-  async function save() {
-    setSaving(true);
-    audio.click();
-    await supabase.from('profiles').update({
-      username,
-      character_type: cfg.character_type,
-      body_color: cfg.body_color,
-      hat: cfg.hat,
-      updated_at: new Date().toISOString(),
-    }).eq('id', profile!.id);
-    await refreshProfile();
-    setSaving(false);
+  function updateConfig(key: keyof CharacterConfig, value: string) {
+    setCfg((current) => ({
+      ...current,
+      [key]: value,
+    }));
+    setSaved(false);
+  }
+
+  function handleSave() {
+    saveCharacterConfig(cfg);
+    audio.resume();
     setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-100 via-sky-100 to-emerald-100 p-4 sm:p-8">
-      <div className="max-w-3xl mx-auto">
+    <main className="min-h-screen bg-slate-950 text-white px-5 py-8">
+      <div className="max-w-2xl mx-auto">
         <button
-          onClick={() => { audio.click(); onBack(); }}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-800 font-bold text-sm mb-6 transition"
+          onClick={onBack}
+          className="flex items-center gap-2 text-slate-300 hover:text-white font-semibold mb-8"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to menu
+          <ArrowLeft size={20} />
+          BACK TO MENU
         </button>
 
-        <h1 className="text-3xl font-black text-slate-800 mb-1">Customize Your Runner</h1>
-        <p className="text-slate-500 mb-8">Pick a body, color, and hat. Your choice shows up in-game and on the leaderboard.</p>
+        <h1 className="text-3xl sm:text-4xl font-black">
+          CUSTOMIZE <span className="text-cyan-400">RUNNER</span>
+        </h1>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Preview */}
-          <div className="bg-white rounded-3xl shadow-xl p-8 flex flex-col items-center border border-white">
-            <div className="w-48 h-48 rounded-2xl bg-gradient-to-br from-sky-100 to-emerald-100 flex items-center justify-center mb-4">
-              <CharacterPreview cfg={cfg} size={180} />
-            </div>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              maxLength={20}
-              className="text-center text-xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 w-full focus:border-amber-400 outline-none"
-            />
-            <button
-              onClick={save}
-              disabled={saving}
-              className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold shadow-lg hover:from-amber-600 hover:to-orange-600 transition disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {saved ? <><Check className="w-5 h-5" /> Saved!</> : saving ? 'Saving…' : 'Save Look'}
-            </button>
+        <p className="text-slate-400 mt-2">
+          Create a character that feels like yours.
+        </p>
+
+        <section className="flex flex-col items-center bg-slate-900 border border-slate-800 rounded-2xl p-6 mt-8">
+          <CharacterPreview cfg={cfg} size={150} animate={false} />
+          <p className="text-cyan-400 font-black tracking-widest mt-4">
+            {cfg.character_type.toUpperCase()} RUNNER
+          </p>
+        </section>
+
+        <section className="mt-8">
+          <h2 className="font-black text-lg mb-4">CHOOSE CHARACTER</h2>
+
+          <div className="grid grid-cols-3 gap-3">
+            {CHARACTERS.map((character) => (
+              <button
+                key={character.id}
+                onClick={() => updateConfig('character_type', character.id)}
+                className={`rounded-xl border p-3 text-center transition ${
+                  cfg.character_type === character.id
+                    ? 'border-cyan-400 bg-cyan-400/10'
+                    : 'border-slate-800 bg-slate-900'
+                }`}
+              >
+                <span className="block font-black">{character.name}</span>
+                <span className="block text-xs text-slate-400 mt-1">
+                  {character.description}
+                </span>
+                {cfg.character_type === character.id && (
+                  <Check size={16} className="mx-auto mt-2 text-cyan-400" />
+                )}
+              </button>
+            ))}
           </div>
+        </section>
 
-          {/* Options */}
-          <div className="space-y-6">
-            <Section title="Character">
-              <div className="grid grid-cols-3 gap-3">
-                {CHARACTERS.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => { audio.click(); setCfg({ ...cfg, character_type: c.id }); }}
-                    className={`p-3 rounded-2xl border-2 text-center transition ${cfg.character_type === c.id ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}
-                  >
-                    <div className="flex justify-center mb-1">
-                      <CharacterPreview cfg={{ ...cfg, character_type: c.id }} size={56} animate={false} />
-                    </div>
-                    <div className="font-bold text-sm text-slate-700">{c.name}</div>
-                  </button>
-                ))}
-              </div>
-            </Section>
+        <section className="mt-8">
+          <h2 className="font-black text-lg mb-4">BODY COLOR</h2>
 
-            <Section title="Color">
-              <div className="flex flex-wrap gap-3">
-                {COLORS.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => { audio.click(); setCfg({ ...cfg, body_color: color }); }}
-                    className={`w-10 h-10 rounded-full border-4 transition ${cfg.body_color === color ? 'border-slate-700 scale-110' : 'border-white shadow'}`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
-            </Section>
-
-            <Section title="Hat">
-              <div className="grid grid-cols-4 gap-3">
-                {HATS.map((h) => (
-                  <button
-                    key={h.id}
-                    onClick={() => { audio.click(); setCfg({ ...cfg, hat: h.id }); }}
-                    className={`p-2 rounded-2xl border-2 text-center transition ${cfg.hat === h.id ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}
-                  >
-                    <div className="flex justify-center mb-1">
-                      <CharacterPreview cfg={{ ...cfg, hat: h.id }} size={48} animate={false} />
-                    </div>
-                    <div className="text-xs font-bold text-slate-600">{h.name}</div>
-                  </button>
-                ))}
-              </div>
-            </Section>
+          <div className="flex flex-wrap gap-4">
+            {COLORS.map((color) => (
+              <button
+                key={color.id}
+                onClick={() => updateConfig('body_color', color.id)}
+                aria-label={color.name}
+                title={color.name}
+                className={`w-11 h-11 rounded-full border-4 transition ${
+                  cfg.body_color === color.id
+                    ? 'border-white scale-110'
+                    : 'border-transparent'
+                }`}
+                style={{ backgroundColor: color.id }}
+              />
+            ))}
           </div>
-        </div>
+        </section>
+
+        <section className="mt-8">
+          <h2 className="font-black text-lg mb-4">HEADWEAR</h2>
+
+          <div className="grid grid-cols-4 gap-3">
+            {HATS.map((hat) => (
+              <button
+                key={hat.id}
+                onClick={() => updateConfig('hat', hat.id)}
+                className={`rounded-xl border p-3 font-bold text-sm transition ${
+                  cfg.hat === hat.id
+                    ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
+                    : 'border-slate-800 bg-slate-900 text-slate-300'
+                }`}
+              >
+                {hat.name}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <button
+          onClick={handleSave}
+          className="w-full flex items-center justify-center gap-3 bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-lg py-4 rounded-2xl mt-10 transition"
+        >
+          {saved ? <Check size={22} /> : <Save size={22} />}
+          {saved ? 'LOOK SAVED!' : 'SAVE LOOK'}
+        </button>
       </div>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-3xl shadow-xl p-5 border border-white">
-      <h3 className="font-black text-slate-700 mb-3 text-sm uppercase tracking-wide">{title}</h3>
-      {children}
-    </div>
+    </main>
   );
 }
