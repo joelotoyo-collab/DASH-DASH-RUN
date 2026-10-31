@@ -25,7 +25,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: "project-bolt-sb1-364jgj8n (2)"
+        working-directory: "project-bolt-sb1-364jgj8n (2)/project"
 
     steps:
       - name: Checkout
@@ -45,7 +45,7 @@ jobs:
       - name: Upload game
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "project-bolt-sb1-364jgj8n (2)/dist"
+          path: "project-bolt-sb1-364jgj8n (2)/project/dist"
 
       - name: Publish game
         id: deployment
