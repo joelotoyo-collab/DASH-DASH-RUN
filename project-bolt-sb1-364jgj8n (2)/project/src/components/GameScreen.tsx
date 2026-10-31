@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { audio } from '@/lib/audio';
 import { RunnerGame, type GameResult } from '@/lib/game';
-import { getCharacterConfig, getBestScore, saveScore } from '@/lib/storage';
+import {
+  getCharacterConfig,
+  getBestScore,
+  saveScore,
+} from '@/lib/storage';
 import { Home, RotateCw, Trophy } from 'lucide-react';
 
 export function GameScreen({
@@ -30,24 +34,41 @@ export function GameScreen({
     const onResize = () => game.resize();
 
     window.addEventListener('resize', onResize);
+
     game.start();
 
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault();
+        audio.resume();
         game.jump();
       }
     };
 
     window.addEventListener('keydown', onKey);
 
-    const clickHandler = () => game.jump();
+    const clickHandler = () => {
+      audio.resume();
+      game.jump();
+    };
+
     canvas.addEventListener('pointerdown', clickHandler);
+
+    // Start background music after the player's first interaction.
+    const startAudio = () => {
+      audio.resume();
+      audio.startMusic();
+    };
+
+    canvas.addEventListener('pointerdown', startAudio);
 
     return () => {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('keydown', onKey);
       canvas.removeEventListener('pointerdown', clickHandler);
+      canvas.removeEventListener('pointerdown', startAudio);
+
+      audio.stopMusic();
       game.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,9 +84,12 @@ export function GameScreen({
   function restart() {
     audio.resume();
     audio.click();
+    audio.startMusic();
+
     setResult(null);
     setScore(0);
     setSavedBest(null);
+
     gameRef.current?.start();
   }
 
@@ -85,6 +109,7 @@ export function GameScreen({
       <button
         onClick={() => {
           audio.click();
+          audio.stopMusic();
           onExit();
         }}
         className="absolute top-4 left-4 bg-black/40 backdrop-blur text-white p-2 rounded-xl hover:bg-black/60 transition"
@@ -148,6 +173,7 @@ export function GameScreen({
               <button
                 onClick={() => {
                   audio.click();
+                  audio.stopMusic();
                   onLeaderboard();
                 }}
                 className="py-2.5 rounded-2xl bg-emerald-100 text-emerald-700 font-bold hover:bg-emerald-200 transition flex items-center justify-center gap-2"
@@ -159,6 +185,7 @@ export function GameScreen({
               <button
                 onClick={() => {
                   audio.click();
+                  audio.stopMusic();
                   onExit();
                 }}
                 className="py-2.5 rounded-2xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition flex items-center justify-center gap-2"
